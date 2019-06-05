@@ -1,0 +1,244 @@
+import pygame, time, os, sys
+
+WHITE = (255, 255, 255)
+GRAY = (80, 80, 80)
+GREEN = (50, 50, 255)
+INNER_W = 32 * 22
+INNER_H = 32 * 31
+WIN_W = 16 * 32
+WIN_H = 700
+COUNTER = 0
+TIMER = 0
+
+SHIP_W = 30
+SHIP_H = 50
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, y, rect):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface((5,5))
+        self.image.convert()
+        self.speed = 8
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.x = rect
+        self.rect.y = y
+
+    def update(self):
+        self.rect.y -= self.speed
+
+        if self.rect.y < 0:
+            self.kill()
+
+class Platform (pygame.sprite.Sprite):
+    def __init__(self, xpos, ypos):
+        pygame.sprite.Sprite.__init__ (self)
+        self.image = pygame.Surface ((32, 32))
+        self.image.convert()
+        self.image.fill (GRAY)
+        self.rect = pygame.Rect (xpos, ypos, 32, 32)
+
+
+class Ship (pygame.sprite.Sprite):
+    def __init__(self, container):
+        pygame.sprite.Sprite.__init__ (self)
+        self.container = container
+        self.side_speed = 5
+        self.top_speed = 4
+        self.image = pygame.Surface ((SHIP_W, SHIP_H)).convert()
+        self.image.fill (GREEN)
+        self.rect = self.image.get_rect ()
+        self.rect.centerx = self.container.centerx
+        self.rect.y = self.container.bottom - (3 * (self.rect.height))
+        self.timer = 0
+
+    def update(self, bullet_group):
+        key = pygame.key.get_pressed ()
+        if key[pygame.K_w]:
+            self.rect.y -= self.top_speed
+        if key[pygame.K_s]:
+            self.rect.y += self.top_speed
+        if key[pygame.K_a]:
+            self.rect.x -= self.side_speed
+        if key[pygame.K_d]:
+            self.rect.x += self.side_speed
+        if key[pygame.K_SPACE]:
+            if self.timer % 10 == 0:
+                b1 = Bullet(self.rect.y, self.rect.x)
+                b2 = Bullet(self.rect.y, (self.rect.x + SHIP_W - 5))
+                bullet_group.add(b1)
+                bullet_group.add(b2)
+
+        self.timer += 1
+
+        self.rect.clamp_ip (self.container)
+
+
+    def check(self, camera_ent):
+
+        if camera_ent.is_moving == True:
+            self.rect.y = self.rect.y - 1
+
+            if self.rect.bottom > camera_ent.rect.y + WIN_H/2:
+                self.rect.bottom = camera_ent.rect.y + WIN_H/2
+
+            if self.rect.top < camera_ent.rect.y - WIN_H/2:
+                self.rect.top = camera_ent.rect.y - WIN_H/2
+
+        if camera_ent.is_moving == False and camera_ent.rect.y < WIN_H/2:
+            if self.rect.bottom > WIN_H:
+                self.rect.bottom = WIN_H
+
+    def sleep(self):
+            time.sleep(2)
+class Camera:
+    def __init__(self):
+        self.x_offset = 0
+        self.y_offset = 0
+
+    def apply(self, obj):
+        return pygame.Rect((obj.rect.x + self.x_offset), (obj.rect.y + self.y_offset), obj.rect.width, obj.rect.height)
+
+    def update(self, ship, camera_entity):
+        print self.x_offset
+        self.x_offset = -ship.rect.x + WIN_W / 2
+        self.y_offset = -camera_entity.rect.y + WIN_H / 2
+
+        if self.x_offset < -(INNER_W - WIN_W):
+            self.x_offset = -(INNER_W - WIN_W)
+        if self.x_offset > 0:
+            self.x_offset = 0
+        if self.y_offset > 0:
+            self.y_offset = 0
+        if self.y_offset < -(INNER_H - WIN_H):
+            self.y_offset = -(INNER_H - WIN_H)
+
+class Camera_Entity(pygame.sprite.Sprite):
+    def __init__(self, container):
+        pygame.sprite.Sprite.__init__(self)
+        self.container = container
+        self.image = pygame.Surface((10,10)).convert()
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = container.centerx
+        self.rect.y = container.bottom - WIN_H/4
+        self.is_moving = False
+
+    def update(self):
+        if self.rect.y != 0:
+            self.rect.y -= 1
+        if self.rect.y < self.container.bottom -WIN_H/2:
+            self.is_moving = True
+
+        if self.rect.y < WIN_H / 2:
+            self.is_moving = False
+
+
+
+def main():
+    # create var
+    global COUNTER
+    global TIMER
+    pygame.init ()
+    fps = 60
+    clock = pygame.time.Clock ()
+    play = True
+    pygame.display.set_caption ("Raiden")
+    screen = pygame.display.set_mode ((WIN_W, WIN_H), pygame.SRCALPHA)
+    platform_group = pygame.sprite.Group ()
+    bullet_group = pygame.sprite.Group()
+
+    # Load Level
+    level = [
+        "PPPPPPPPPPPPPPPPPPPPPP",
+        "P                    P",
+        "P                    P",
+        "P                PPPPP",
+        "P                    P",
+        "PPPPPPPP             P",
+        "P                    P",
+        "P                    P",
+        "P                    P",
+        "P                    P",
+        "P                    P",
+        "P                PPPPP",
+        "P                    P",
+        "PPPPPPPP             P",
+        "P                    P",
+        "P                    P",
+        "P                    P",
+        "P                PPPPP",
+        "P                    P",
+        "P                    P",
+        "PPPP                 P",
+        "P                    P",
+        "P                 PPPP",
+        "PPPPP                P",
+        "P                    P",
+        "P                    P",
+        "P              PPPPPPP",
+        "P                    P",
+        "PPPPPP               P",
+        "P                    P",
+        "PPPPPPPPPPPPPPPPPPPPPP", ]
+
+    x = y = 0
+    # Build the level
+    for row in level:
+        for col in row:
+            if col == "P":
+                p = Platform(x, y)
+                platform_group.add(p)
+            x += 32
+        y += 32
+        x = 0
+
+    # create obj
+    container = pygame.Rect (0, 0, len (level[0]) * 31, len (level) * 31)
+    ship = Ship (container)
+    camera = Camera()
+    camera_ent = Camera_Entity(container)
+
+
+
+    while play:
+        # Checks if window exit button pressed
+        for event in pygame.event.get ():
+            if event.type == pygame.QUIT:
+                sys.exit ()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    sys.exit ()
+        # read input
+
+        # run update
+        ship.update(bullet_group)
+        camera_ent.update()
+        camera.update (ship, camera_ent)
+        ship.check(camera_ent)
+        bullet_group.update()
+
+
+
+        # draw obj
+        screen.fill (WHITE)
+        for p in platform_group:
+            screen.blit (p.image, camera.apply (p))
+        screen.blit (ship.image, camera.apply (ship))
+        for b in bullet_group:
+            screen.blit(b.image, camera.apply(b))
+        # limits framer per iteration
+        clock.tick (fps)
+        # writes to main surface
+        pygame.display.flip ()
+        if COUNTER < 1:
+            ship.sleep()
+            COUNTER = 1
+
+        # update
+
+        # screen
+
+
+if __name__ == '__main__':
+    main ()
